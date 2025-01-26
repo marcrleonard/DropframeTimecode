@@ -52,8 +52,26 @@
 
     </div>
     <p id="fullTimecode"></p>
+    <p id="validTimecode"></p>
 
     <script>
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const params = new URLSearchParams(window.location.search); // Get query string from URL
+            const tValue = params.get('t'); // Get the value of the 't' parameter
+            // debugger;
+            let staringTimecode = "00000000"
+            for (let i = 0; i < tValue.length; i++) {
+                staringTimecode = updateStringByIndex(staringTimecode, i, tValue[i]);
+            }
+
+            document.getElementById("hh").value = staringTimecode.slice(0, 3)
+            document.getElementById("mm").value
+            document.getElementById("ss").value
+            document.getElementById("ff").value
+
+        });
+
         function moveNext(current, nextId) {
             if (current.value.length >= current.maxLength) {
                 document.getElementById(nextId)?.focus();
@@ -67,8 +85,42 @@
             const ff = document.getElementById("ff").value.padStart(2, '0');
             const framerate = document.getElementById("framerate").value;
 
-            const timecode = `${hh}:${mm}:${ss};${ff} @ ${framerate} fps`;
-            document.getElementById("fullTimecode").textContent = timecode;
+            const params = new URLSearchParams(window.location.search); // Get current query string
+            // Set or update the 't' parameter with a new value (e.g., 12345678)
+            params.set('t', `${hh}${mm}${ss}${ff}`);
+            // Update the browser's URL (without reloading the page)
+            window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
+
+
+            const timecode = `${hh}:${mm}:${ss};${ff}`;
+            const timecode_full = `${timecode} @ ${framerate} fps`;
+
+            valid = isValidDropFrameTimecode(timecode);
+
+            document.getElementById("fullTimecode").textContent = timecode_full;
+            document.getElementById("validTimecode").textContent = valid;
+        }
+
+        function isValidDropFrameTimecode(timecode) {
+            const dropFrameRegex = /^(\d{2}):(\d{2}):(\d{2});(\d{2})$/;
+            const match = timecode.match(dropFrameRegex);
+
+            if (!match) return false;
+
+            let hours = parseInt(match[1], 10);
+            let minutes = parseInt(match[2], 10);
+            let seconds = parseInt(match[3], 10);
+            let frames = parseInt(match[4], 10);
+
+            if (hours > 23 || minutes > 59 || seconds > 59 || frames > 29) return false;
+
+            // Drop-frame rule: Skips frame numbers 00 and 01 at every minute except multiples of 10
+            if (frames < 2) {
+                let totalMinutes = hours * 60 + minutes;
+                if (totalMinutes % 10 !== 0) return false;
+            }
+
+            return true;
         }
     </script>
 </body>
