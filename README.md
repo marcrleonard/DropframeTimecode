@@ -1,0 +1,1 @@
+Yes - I own the domain dropframetimecode.com
