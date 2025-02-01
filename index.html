@@ -16,7 +16,7 @@
         .input-container {
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 2px;
         }
         .time-input {
             width: 40px;
@@ -32,11 +32,29 @@
             font-size: 1.2em;
             margin-left: 10px;
         }
+
+        @media (max-width: 309px) {
+            .time-input {
+                width: 30px;
+                text-align: center;
+                font-size: .9em;
+                border: 1px solid rgba(128, 128, 128, 0.21);
+            }
+            .delimiter {
+                font-size: .9em;
+                font-weight: bold;
+            }
+            select {
+                font-size: .9em;
+                margin-left: 5px;
+            }
+    }
+
     </style>
 </head>
 <body>
-    <h1>Timecode Entry</h1>
-    <p>Enter timecode in HH:MM:SS;FF format to see if it is valid drop frame timecode.</p>
+    <h1 style="text-align: center;">Timecode Entry</h1>
+    <p style="text-align: center;">Enter timecode in HH:MM:SS;FF format to see if it is valid drop frame timecode.</p>
     <div class="input-container">
         <input value="01" type="text" class="time-input" id="hh" maxlength="2" oninput="updateTimecode(); moveNext(this, 'mm')">
         <span class="delimiter">:</span>
@@ -53,7 +71,7 @@
     </div>
     <p id="fullTimecode"></p>
 
-    <p>A fun weekend project by <a href="https://marcrleonard.com">Marc R Leonard</a></p>
+    <p style="text-align: center;">A fun weekend project by <a href="https://marcrleonard.com">Marc R Leonard</a></p>
     <script>
 
         document.addEventListener("DOMContentLoaded", function () {
