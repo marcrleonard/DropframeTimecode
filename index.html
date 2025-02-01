@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Timecode Entry</title>
+    <title>Drop frame timecode checker</title>
     <style>
         body {
             display: flex;
@@ -36,7 +36,7 @@
 </head>
 <body>
     <h1>Timecode Entry</h1>
-    <p>Enter timecode in HH:MM:SS;FF format</p>
+    <p>Enter timecode in HH:MM:SS;FF format to see if it is valid drop frame timecode.</p>
     <div class="input-container">
         <input value="01" type="text" class="time-input" id="hh" maxlength="2" oninput="updateTimecode(); moveNext(this, 'mm')">
         <span class="delimiter">:</span>
@@ -53,6 +53,7 @@
     </div>
     <p id="fullTimecode"></p>
 
+    <p>A fun weekend project by <a href="https://marcrleonard.com">Marc R Leonard</a></p>
     <script>
 
         document.addEventListener("DOMContentLoaded", function () {
