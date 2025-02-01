@@ -58,19 +58,41 @@
 
         document.addEventListener("DOMContentLoaded", function () {
             const params = new URLSearchParams(window.location.search); // Get query string from URL
-            const tValue = params.get('t'); // Get the value of the 't' parameter
-            // debugger;
-            let staringTimecode = "00000000"
-            for (let i = 0; i < tValue.length; i++) {
-                staringTimecode = updateStringByIndex(staringTimecode, i, tValue[i]);
+            let tValue = params.get('t') || ""; // Default to empty string if null
+
+            if (!tValue) {
+                return
             }
 
-            document.getElementById("hh").value = staringTimecode.slice(0, 3)
-            document.getElementById("mm").value
-            document.getElementById("ss").value
-            document.getElementById("ff").value
+            let fps = "29.97"
+            if (tValue.includes("@")) {
+                const parts = tValue.split('@');
+                tValue = parts[0]
 
+                let _fps = parts.slice(1).join('@'); // Ensures only the first @ is used for splitting
+                if (_fps === "29.97" || _fps === "59.94") {
+                    fps = _fps
+                }
+            }
+
+            let startingTimecode = "00000000"; // Fixed typo
+
+            for (let i = 0; i < tValue.length; i++) {
+                startingTimecode = updateStringByIndex(startingTimecode, i, tValue[i]);
+            }
+
+            document.getElementById("hh").value = startingTimecode.slice(0, 2);
+            document.getElementById("mm").value = startingTimecode.slice(2, 4);
+            document.getElementById("ss").value = startingTimecode.slice(4, 6);
+            document.getElementById("ff").value = startingTimecode.slice(6, 8);
+            document.getElementById("framerate").value=fps
+
+            updateTimecode();
         });
+
+        function updateStringByIndex(str, index, char) {
+            return str.substring(0, index) + char + str.substring(index + 1);
+        }
 
         function moveNext(current, nextId) {
             if (current.value.length >= current.maxLength) {
@@ -87,41 +109,57 @@
 
             const params = new URLSearchParams(window.location.search); // Get current query string
             // Set or update the 't' parameter with a new value (e.g., 12345678)
-            params.set('t', `${hh}${mm}${ss}${ff}`);
+            params.set('t', `${hh}${mm}${ss}${ff}@${framerate}`);
             // Update the browser's URL (without reloading the page)
             window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
 
 
             const timecode = `${hh}:${mm}:${ss};${ff}`;
-            const timecode_full = `${timecode} @ ${framerate} fps`;
+            const timecode_full = `${timecode} @ ${framerate}fps`;
 
-            valid = isValidDropFrameTimecode(timecode);
+            let valid = isValidDropFrameTimecode(timecode, framerate);
 
-            document.getElementById("fullTimecode").textContent = timecode_full;
+            let tcText = `✅ ${timecode} is valid drop frame timecode`
+
+            if (!valid) {
+                tcText = `❌ ${timecode} is <strong>not</strong> valid drop frame timecode`
+            }
+
+            document.getElementById("fullTimecode").innerHTML = tcText;
             document.getElementById("validTimecode").textContent = valid;
         }
 
-        function isValidDropFrameTimecode(timecode) {
-            const dropFrameRegex = /^(\d{2}):(\d{2}):(\d{2});(\d{2})$/;
-            const match = timecode.match(dropFrameRegex);
+    function isValidDropFrameTimecode(timecode, fps) {
 
-            if (!match) return false;
-
-            let hours = parseInt(match[1], 10);
-            let minutes = parseInt(match[2], 10);
-            let seconds = parseInt(match[3], 10);
-            let frames = parseInt(match[4], 10);
-
-            if (hours > 23 || minutes > 59 || seconds > 59 || frames > 29) return false;
-
-            // Drop-frame rule: Skips frame numbers 00 and 01 at every minute except multiples of 10
-            if (frames < 2) {
-                let totalMinutes = hours * 60 + minutes;
-                if (totalMinutes % 10 !== 0) return false;
-            }
-
-            return true;
+        fps = parseFloat(fps);
+        let lastFrame = 2;
+        if (fps === 59.94) {
+            lastFrame = 4
         }
+
+        const dropFrameRegex = /^(\d{2}):(\d{2}):(\d{2});(\d{2})$/;
+        const match = timecode.match(dropFrameRegex);
+
+        if (!match) return false;
+
+        let hours = parseInt(match[1], 10);
+        let minutes = parseInt(match[2], 10);
+        let seconds = parseInt(match[3], 10);
+        let frames = parseInt(match[4], 10);
+
+        // Validate time range
+        if (hours > 23 || minutes > 59 || seconds > 59 || frames > 29) return false;
+
+        // Drop-frame rule: At the start of each minute (seconds == 0),
+        // frames 00 and 01 are skipped, except for minutes that are multiples of 10.
+        if (seconds === 0 && frames < 2 && minutes % 10 !== 0) {
+            return false;
+        }
+
+        return true;
+    }
+
+
     </script>
 </body>
 </html>
