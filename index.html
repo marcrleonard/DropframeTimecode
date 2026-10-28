@@ -3,180 +3,876 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Drop frame timecode checker</title>
+    <title>Drop Frame Timecode Checker</title>
+    <meta name="description" content="Check whether a timecode is valid SMPTE drop frame timecode at 29.97 or 59.94 fps, and learn why drop frame exists.">
+    <meta name="theme-color" content="#0b0d10">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg: #0b0d10;
+            --bg-raised: #12161b;
+            --bg-inset: #07090b;
+            --border: #222932;
+            --border-strong: #2f3843;
+            --text: #e7ebf0;
+            --text-muted: #8c96a3;
+            --text-faint: #5b6470;
+            --accent: #ffb547;
+            --accent-glow: rgba(255, 181, 71, 0.35);
+            --good: #3ddc97;
+            --good-bg: rgba(61, 220, 151, 0.08);
+            --bad: #ff5f6d;
+            --bad-bg: rgba(255, 95, 109, 0.08);
+            --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+            --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+            --radius: 14px;
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: #f6f4ef;
+                --bg-raised: #ffffff;
+                --bg-inset: #1a1d22;
+                --border: #e3dfd6;
+                --border-strong: #cfc9bc;
+                --text: #16191d;
+                --text-muted: #5d6570;
+                --text-faint: #8e959e;
+                --accent: #d9831a;
+                --accent-glow: rgba(255, 181, 71, 0.35);
+                --good: #12935c;
+                --good-bg: rgba(18, 147, 92, 0.08);
+                --bad: #d6293a;
+                --bad-bg: rgba(214, 41, 58, 0.07);
+            }
+        }
+
+        *, *::before, *::after { box-sizing: border-box; }
+
+        html { -webkit-text-size-adjust: 100%; }
+
         body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--sans);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+        a:hover { text-decoration-thickness: 2px; }
+
+        code {
+            font-family: var(--mono);
+            font-size: 0.9em;
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            padding: 0.1em 0.4em;
+            border-radius: 6px;
+        }
+
+        .wrap {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 0 16px;
+        }
+
+        /* ---------- Hero / checker ---------- */
+
+        header {
+            padding: 72px 0 24px;
+            text-align: center;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--mono);
+            font-size: 12px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .rec-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--bad);
+            box-shadow: 0 0 10px var(--bad);
+            animation: blink 1.6s steps(2, start) infinite;
+        }
+
+        @keyframes blink { to { visibility: hidden; } }
+
+        h1 {
+            font-size: clamp(2rem, 6vw, 3.25rem);
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+            margin: 16px 0 12px;
+            font-weight: 700;
+        }
+
+        .lede {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            max-width: 520px;
+            margin: 0 auto;
+        }
+
+        .checker {
+            margin: 32px auto 0;
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.6);
+        }
+
+        .display {
+            position: relative;
+            background: var(--bg-inset);
+            border-radius: 10px;
+            padding: 28px 12px 22px;
+            overflow: hidden;
+        }
+
+        /* faint scanlines for the broadcast-monitor feel */
+        .display::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.025) 0 1px, transparent 1px 3px);
+        }
+
+        .display-label {
+            position: absolute;
+            top: 10px;
+            left: 14px;
+            right: 14px;
+            display: flex;
+            justify-content: space-between;
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: #5b6470;
+        }
+
+        .tc {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: var(--mono);
+            font-weight: 500;
+            font-size: clamp(2.2rem, 11vw, 4.5rem);
+            line-height: 1;
+            color: #ffb547;
+            text-shadow: 0 0 18px var(--accent-glow);
+        }
+
+        .tc input {
+            width: 1.3em;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: inherit;
+            font: inherit;
+            text-shadow: inherit;
+            text-align: center;
+            caret-color: #ffb547;
+            border-radius: 6px;
+            transition: background 120ms;
+        }
+
+        .tc input:focus {
+            outline: none;
+            background: rgba(255, 181, 71, 0.1);
+        }
+
+        .tc .sep {
+            opacity: 0.7;
+            width: 0.5em;
+            text-align: center;
+        }
+
+        .tc .sep.semi { color: #fff; opacity: 0.9; }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 16px;
+        }
+
+        .segmented {
+            display: inline-flex;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 3px;
+        }
+
+        .segmented button {
+            font-family: var(--mono);
+            font-size: 14px;
+            border: 0;
+            background: transparent;
+            color: var(--text-muted);
+            padding: 6px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: background 120ms, color 120ms;
+        }
+
+        .segmented button[aria-pressed="true"] {
+            background: var(--text);
+            color: var(--bg);
+        }
+
+        .ghost-btn {
+            font-family: var(--sans);
+            font-size: 14px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            padding: 7px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: border-color 120ms, color 120ms;
+        }
+
+        .ghost-btn:hover { border-color: var(--border-strong); color: var(--text); }
+
+        .result {
+            margin-top: 16px;
+            padding: 14px 16px;
+            border-radius: 10px;
+            border: 1px solid;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            text-align: left;
+        }
+
+        .result.good { background: var(--good-bg); border-color: color-mix(in srgb, var(--good) 35%, transparent); }
+        .result.bad  { background: var(--bad-bg);  border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
+
+        .result .icon {
+            flex: none;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--bg);
+        }
+
+        .result.good .icon { background: var(--good); }
+        .result.bad  .icon { background: var(--bad); }
+
+        .result .headline { font-weight: 600; }
+        .result .detail { color: var(--text-muted); font-size: 0.95rem; }
+        .result .detail button {
+            font: inherit;
+            color: var(--accent);
+            background: none;
+            border: 0;
+            padding: 0;
+            cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            margin-top: 16px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .stat {
+            text-align: left;
+            background: var(--bg-raised);
+            padding: 12px 14px;
+            min-width: 0;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+
+        .stat-value {
+            font-family: var(--mono);
+            font-size: 15px;
+            overflow-wrap: anywhere;
+        }
+
+        /* ---------- Content sections ---------- */
+
+        section {
+            padding: 56px 0 8px;
+        }
+
+        h2 {
+            font-size: 1.6rem;
+            letter-spacing: -0.02em;
+            margin: 0 0 12px;
+        }
+
+        h3 {
+            font-size: 1.05rem;
+            margin: 28px 0 8px;
+        }
+
+        section p { color: var(--text-muted); }
+        section p strong { color: var(--text); font-weight: 600; }
+
+        .rule-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .card {
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px;
+        }
+
+        .card .big {
+            font-family: var(--mono);
+            font-size: 1.4rem;
+            color: var(--accent);
+            margin-bottom: 4px;
+        }
+
+        .card p { margin: 0; font-size: 0.95rem; }
+
+        .ticks {
+            margin-top: 20px;
+            font-family: var(--mono);
+            font-size: 13px;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            font-family: Arial, sans-serif;
+            gap: 6px;
         }
-        .input-container {
+
+        .tick-row {
             display: flex;
             align-items: center;
-            gap: 2px;
+            gap: 10px;
+            flex-wrap: wrap;
         }
-        .time-input {
-            width: 40px;
+
+        .tick-row .lbl { color: var(--text-faint); width: 6.5em; flex: none; }
+
+        .frame {
+            padding: 3px 7px;
+            border-radius: 5px;
+            border: 1px solid var(--border);
+            background: var(--bg-raised);
+        }
+
+        .frame.dropped {
+            color: var(--bad);
+            border-style: dashed;
+            border-color: color-mix(in srgb, var(--bad) 45%, transparent);
+            background: transparent;
+            text-decoration: line-through;
+        }
+
+        /* ---------- TimecodeTool ---------- */
+
+        .tool {
+            margin-top: 8px;
+            background: linear-gradient(180deg, var(--bg-raised), var(--bg));
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+        }
+
+        .tool-head {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .tool-head h2 { margin: 0; }
+
+        .pill {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 3px 10px;
+        }
+
+        .terminal {
+            margin-top: 20px;
+            background: #07090b;
+            border: 1px solid #1c2229;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .terminal-bar {
+            display: flex;
+            gap: 6px;
+            padding: 10px 12px;
+            border-bottom: 1px solid #1c2229;
+        }
+
+        .terminal-bar span {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #2a323c;
+        }
+
+        .terminal pre {
+            margin: 0;
+            padding: 16px;
+            overflow-x: auto;
+            font-family: var(--mono);
+            font-size: 13px;
+            line-height: 1.7;
+            color: #c9d1db;
+        }
+
+        .terminal .p { color: #3ddc97; user-select: none; }
+        .terminal .c { color: #5b6470; }
+        .terminal .s { color: #ffb547; }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .feature-list li {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .feature-list li strong {
+            display: block;
+            color: var(--text);
+            font-family: var(--mono);
+            font-weight: 500;
+        }
+
+        .cta-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 22px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            text-decoration: none;
+            padding: 10px 16px;
+            border-radius: 999px;
+            border: 1px solid var(--border-strong);
+            color: var(--text);
+        }
+
+        .btn.primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #16191d;
+        }
+
+        .btn:hover { text-decoration: none; filter: brightness(1.08); }
+
+        footer {
+            padding: 64px 0 48px;
             text-align: center;
-            font-size: 1.5em;
-            border: 1px solid rgba(128, 128, 128, 0.21);
-        }
-        .delimiter {
-            font-size: 1.5em;
-            font-weight: bold;
-        }
-        select {
-            font-size: 1.2em;
-            margin-left: 10px;
+            color: var(--text-faint);
+            font-size: 14px;
         }
 
-        @media (max-width: 309px) {
-            .time-input {
-                width: 20px;
-                text-align: center;
-                font-size: .9em;
-                border: 1px solid rgba(128, 128, 128, 0.21);
-            }
-            .delimiter {
-                font-size: .9em;
-                font-weight: bold;
-            }
-            select {
-                font-size: .9em;
-                margin-left: 5px;
-            }
-    }
+        footer a { color: var(--text-muted); }
 
+        @media (max-width: 520px) {
+            header { padding-top: 48px; }
+            .checker { padding: 14px; }
+            .stats { grid-template-columns: 1fr; }
+            .tool { padding: 18px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .rec-dot { animation: none; }
+        }
     </style>
 </head>
 <body>
-    <h1 style="text-align: center;">Timecode Entry</h1>
-    <p style="text-align: center;">Enter timecode in HH:MM:SS;FF format to see if it is valid drop frame timecode.</p>
-    <div class="input-container">
-        <input value="01" type="text" class="time-input" id="hh" maxlength="2" oninput="updateTimecode(); moveNext(this, 'mm')">
-        <span class="delimiter">:</span>
-        <input value="00" type="text" class="time-input" id="mm" maxlength="2" oninput="updateTimecode(); moveNext(this, 'ss')">
-        <span class="delimiter">:</span>
-        <input value="00" type="text" class="time-input" id="ss" maxlength="2" oninput="updateTimecode(); moveNext(this, 'ff')">
-        <span class="delimiter">;</span>
-        <input value="00" type="text" class="time-input" id="ff" maxlength="2" oninput="updateTimecode()">
-        <select id="framerate">
-            <option value="29.97">29.97</option>
-            <option value="59.94">59.94</option>
-        </select>
+    <div class="wrap">
+        <header>
+            <div class="eyebrow"><span class="rec-dot"></span> SMPTE 12M · 29.97 / 59.94</div>
+            <h1>Is it valid drop frame?</h1>
+            <p class="lede">Type a timecode and find out instantly. Drop frame skips a few frame numbers every minute, and this tells you whether yours is one of them.</p>
 
+            <div class="checker">
+                <div class="display">
+                    <div class="display-label"><span>HH : MM : SS ; FF</span><span id="fpsLabel">29.97 DF</span></div>
+                    <div class="tc" role="group" aria-label="Timecode">
+                        <input value="01" inputmode="numeric" autocomplete="off" class="time-input" id="hh" maxlength="2" aria-label="Hours">
+                        <span class="sep">:</span>
+                        <input value="00" inputmode="numeric" autocomplete="off" class="time-input" id="mm" maxlength="2" aria-label="Minutes">
+                        <span class="sep">:</span>
+                        <input value="00" inputmode="numeric" autocomplete="off" class="time-input" id="ss" maxlength="2" aria-label="Seconds">
+                        <span class="sep semi">;</span>
+                        <input value="00" inputmode="numeric" autocomplete="off" class="time-input" id="ff" maxlength="2" aria-label="Frames">
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <div class="segmented" role="group" aria-label="Frame rate">
+                        <button type="button" data-fps="29.97" aria-pressed="true">29.97</button>
+                        <button type="button" data-fps="59.94" aria-pressed="false">59.94</button>
+                    </div>
+                    <button type="button" class="ghost-btn" id="copyLink">Copy link</button>
+                </div>
+
+                <div class="result" id="result" aria-live="polite">
+                    <div class="icon" id="resultIcon"></div>
+                    <div>
+                        <div class="headline" id="resultHeadline"></div>
+                        <div class="detail" id="resultDetail"></div>
+                    </div>
+                </div>
+
+                <div class="stats" id="stats">
+                    <div class="stat"><div class="stat-label">Frame count</div><div class="stat-value" id="statFrames">–</div></div>
+                    <div class="stat"><div class="stat-label">Real time</div><div class="stat-value" id="statReal">–</div></div>
+                    <div class="stat"><div class="stat-label">Drift vs. NDF</div><div class="stat-value" id="statDrift">–</div></div>
+                </div>
+            </div>
+        </header>
+
+        <section id="why">
+            <h2>Why drop frame exists</h2>
+            <p>
+                NTSC color video runs at <strong>30000/1001 ≈ 29.97 frames per second</strong>, not 30. If you
+                count those frames with plain 30 fps timecode, the clock on the wall pulls ahead of the timecode
+                by about <strong>3.6 seconds every hour</strong>. That's fine until someone needs a one-hour show to
+                actually be one hour.
+            </p>
+            <p>
+                Drop frame fixes this by <strong>skipping frame <em>numbers</em></strong> (never actual frames) so the
+                timecode stays in step with real time. The picture is untouched; only the labels jump.
+            </p>
+
+            <div class="rule-grid">
+                <div class="card">
+                    <div class="big">;00 ;01</div>
+                    <p>At 29.97, the first <strong>2</strong> frame numbers of every minute are skipped.</p>
+                </div>
+                <div class="card">
+                    <div class="big">;00 → ;03</div>
+                    <p>At 59.94, the first <strong>4</strong> frame numbers of every minute are skipped.</p>
+                </div>
+                <div class="card">
+                    <div class="big">×10</div>
+                    <p>Except every 10th minute (00, 10, 20…), where nothing is skipped.</p>
+                </div>
+            </div>
+
+            <h3>What it looks like at 29.97</h3>
+            <div class="ticks" aria-label="Example of frame numbers around a minute boundary">
+                <div class="tick-row">
+                    <span class="lbl">minute 1</span>
+                    <span class="frame">00:00:59;28</span>
+                    <span class="frame">00:00:59;29</span>
+                    <span class="frame dropped">00:01:00;00</span>
+                    <span class="frame dropped">00:01:00;01</span>
+                    <span class="frame">00:01:00;02</span>
+                </div>
+                <div class="tick-row">
+                    <span class="lbl">minute 10</span>
+                    <span class="frame">00:09:59;28</span>
+                    <span class="frame">00:09:59;29</span>
+                    <span class="frame">00:10:00;00</span>
+                    <span class="frame">00:10:00;01</span>
+                    <span class="frame">00:10:00;02</span>
+                </div>
+            </div>
+            <p style="margin-top: 20px;">
+                The math: 2 numbers × 54 non-tenth minutes = <strong>108 frame numbers dropped per hour</strong>, which is
+                exactly the 3.6 seconds of drift. By convention, drop frame uses a semicolon (<code>;</code>) before
+                the frames field and non-drop uses a colon (<code>:</code>).
+            </p>
+        </section>
+
+        <section id="timecodetool">
+            <div class="tool">
+                <div class="tool-head">
+                    <h2>TimecodeTool</h2>
+                    <span class="pill">Go · CLI · MIT</span>
+                </div>
+                <p>
+                    Need this in a script or pipeline? <strong>TimecodeTool</strong> is a small command-line tool (and Go
+                    library) from the same author. It validates timecodes, measures the span between two of them, and
+                    does timecode arithmetic, with JSON output so it fits neatly into automation.
+                </p>
+
+                <div class="terminal">
+                    <div class="terminal-bar"><span></span><span></span><span></span></div>
+<pre><span class="c"># Is this valid drop frame?</span>
+<span class="p">$ </span>TimecodeTool validate <span class="s">"00:07:00;00"</span> --fps=29.97
+
+<span class="c"># Duration and frame count between two timecodes</span>
+<span class="p">$ </span>TimecodeTool span <span class="s">"01:00:00:00"</span> <span class="s">"01:01:00:00"</span> --fps=23.98
+
+<span class="c"># Add and subtract timecodes and raw frames</span>
+<span class="p">$ </span>TimecodeTool calculate <span class="s">"01:00:00:00"</span> + <span class="s">"00:00:01:00"</span> + 23 - <span class="s">"00:00:00:10"</span> --fps=23.98</pre>
+                </div>
+
+                <ul class="feature-list">
+                    <li><strong>validate</strong>Check that a timecode is legal at a given frame rate, drop frame included.</li>
+                    <li><strong>span</strong>Playback duration and frame count between two timecodes, inclusive or exclusive.</li>
+                    <li><strong>calculate</strong>Chain timecodes and frame counts with <code>+</code> and <code>-</code>.</li>
+                </ul>
+
+                <div class="cta-row">
+                    <a class="btn primary" href="https://github.com/marcrleonard/TimecodeTool">View on GitHub →</a>
+                    <a class="btn" href="https://github.com/marcrleonard/TimecodeTool/releases">Download binaries</a>
+                    <a class="btn" href="https://pkg.go.dev/github.com/marcrleonard/TimecodeTool">Go docs</a>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            A fun weekend project by <a href="https://marcrleonard.com">Marc R Leonard</a>
+        </footer>
     </div>
-    <p id="fullTimecode"></p>
 
-    <p style="text-align: center;">A fun weekend project by <a href="https://marcrleonard.com">Marc R Leonard</a></p>
     <script>
+        const FIELDS = ["hh", "mm", "ss", "ff"];
+        const LIMITS = { hh: 23, mm: 59, ss: 59 };
+        let fps = "29.97";
 
-        document.addEventListener("DOMContentLoaded", function () {
-            const params = new URLSearchParams(window.location.search); // Get query string from URL
-            let tValue = params.get('t') || ""; // Default to empty string if null
+        const $ = (id) => document.getElementById(id);
 
-            if (!tValue) {
-                return
+        // Drop frame parameters for a given rate.
+        function dfParams(rate) {
+            return rate === "59.94"
+                ? { nominal: 60, drop: 4, actual: 60000 / 1001 }
+                : { nominal: 30, drop: 2, actual: 30000 / 1001 };
+        }
+
+        function readFields() {
+            const v = {};
+            for (const id of FIELDS) v[id] = $(id).value.padStart(2, "0");
+            return v;
+        }
+
+        // Returns null when valid, otherwise a short reason.
+        function dropFrameError(h, m, s, f, rate) {
+            const { nominal, drop } = dfParams(rate);
+            if (h > 23) return "Hours only go up to 23.";
+            if (m > 59) return "Minutes only go up to 59.";
+            if (s > 59) return "Seconds only go up to 59.";
+            if (f > nominal - 1) return `Frames only go up to ${nominal - 1} at ${rate}.`;
+            if (s === 0 && f < drop && m % 10 !== 0) {
+                const skipped = Array.from({ length: drop }, (_, i) => ";" + String(i).padStart(2, "0")).join(", ");
+                return `Frames ${skipped} are skipped at the top of every minute except multiples of 10.`;
             }
+            return null;
+        }
 
-            let fps = "29.97"
-            if (tValue.includes("@")) {
-                const parts = tValue.split('@');
-                tValue = parts[0]
+        function isValidDropFrameTimecode(timecode, rate) {
+            const match = timecode.match(/^(\d{2}):(\d{2}):(\d{2});(\d{2})$/);
+            if (!match) return false;
+            const [h, m, s, f] = match.slice(1).map(Number);
+            return dropFrameError(h, m, s, f, rate) === null;
+        }
 
-                let _fps = parts.slice(1).join('@'); // Ensures only the first @ is used for splitting
-                if (_fps === "29.97" || _fps === "59.94") {
-                    fps = _fps
+        function frameNumber(h, m, s, f, rate) {
+            const { nominal, drop } = dfParams(rate);
+            const totalMinutes = 60 * h + m;
+            const nominalFrames = ((h * 60 + m) * 60 + s) * nominal + f;
+            return nominalFrames - drop * (totalMinutes - Math.floor(totalMinutes / 10));
+        }
+
+        function formatClock(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${s.toFixed(3).padStart(6, "0")}`;
+        }
+
+        function update() {
+            const v = readFields();
+            const [h, m, s, f] = [v.hh, v.mm, v.ss, v.ff].map(Number);
+            const timecode = `${v.hh}:${v.mm}:${v.ss};${v.ff}`;
+
+            const params = new URLSearchParams(window.location.search);
+            params.set("t", `${v.hh}${v.mm}${v.ss}${v.ff}@${fps}`);
+            window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+
+            $("fpsLabel").textContent = `${fps} DF`;
+
+            const allDigits = FIELDS.every((id) => /^\d{1,2}$/.test($(id).value));
+            const error = allDigits ? dropFrameError(h, m, s, f, fps) : "Use digits only.";
+            const result = $("result");
+            const detail = $("resultDetail");
+
+            if (!error) {
+                result.className = "result good";
+                $("resultIcon").textContent = "✓";
+                $("resultHeadline").textContent = `${timecode} is valid drop frame timecode`;
+                detail.textContent = `At ${fps} fps.`;
+
+                const { nominal, actual } = dfParams(fps);
+                const n = frameNumber(h, m, s, f, fps);
+                const real = n / actual;
+                const ndfSeconds = n / nominal;
+                $("statFrames").textContent = n.toLocaleString();
+                $("statReal").textContent = formatClock(real);
+                $("statDrift").textContent = `${(real - ndfSeconds).toFixed(3)}s`;
+            } else {
+                result.className = "result bad";
+                $("resultIcon").textContent = "✕";
+                $("resultHeadline").textContent = `${timecode} is not valid drop frame timecode`;
+                detail.textContent = error + " ";
+
+                const { drop } = dfParams(fps);
+                if (allDigits && s === 0 && f < drop && m % 10 !== 0 && h <= 23 && m <= 59) {
+                    const next = String(drop).padStart(2, "0");
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.textContent = `Jump to ${v.hh}:${v.mm}:00;${next}`;
+                    btn.addEventListener("click", () => { $("ff").value = next; update(); });
+                    detail.appendChild(btn);
                 }
+
+                for (const id of ["statFrames", "statReal", "statDrift"]) $(id).textContent = "–";
             }
+        }
 
-            let startingTimecode = "00000000"; // Fixed typo
+        function setFps(rate) {
+            fps = rate;
+            document.querySelectorAll(".segmented button").forEach((b) => {
+                b.setAttribute("aria-pressed", String(b.dataset.fps === rate));
+            });
+            update();
+        }
 
-            for (let i = 0; i < tValue.length; i++) {
-                startingTimecode = updateStringByIndex(startingTimecode, i, tValue[i]);
-            }
+        // Field behaviour: digits only, auto-advance, backspace/arrow navigation, up/down to nudge.
+        FIELDS.forEach((id, i) => {
+            const el = $(id);
+            const prev = $(FIELDS[i - 1]);
+            const next = $(FIELDS[i + 1]);
 
-            document.getElementById("hh").value = startingTimecode.slice(0, 2);
-            document.getElementById("mm").value = startingTimecode.slice(2, 4);
-            document.getElementById("ss").value = startingTimecode.slice(4, 6);
-            document.getElementById("ff").value = startingTimecode.slice(6, 8);
-            document.getElementById("framerate").value=fps
+            el.addEventListener("focus", () => el.select());
 
-            updateTimecode();
+            el.addEventListener("input", () => {
+                el.value = el.value.replace(/\D/g, "").slice(0, 2);
+                update();
+                if (el.value.length >= 2 && next) next.focus();
+            });
+
+            el.addEventListener("blur", () => {
+                if (el.value === "") el.value = "00";
+                el.value = el.value.padStart(2, "0");
+                update();
+            });
+
+            el.addEventListener("keydown", (e) => {
+                if (e.key === "Backspace" && el.value === "" && prev) {
+                    e.preventDefault();
+                    prev.focus();
+                } else if (e.key === "ArrowLeft" && el.selectionStart === 0 && prev) {
+                    e.preventDefault();
+                    prev.focus();
+                } else if ((e.key === "ArrowRight" && el.selectionEnd === el.value.length) || e.key === ":" || e.key === ";") {
+                    if (next) { e.preventDefault(); next.focus(); }
+                } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                    e.preventDefault();
+                    const max = id === "ff" ? dfParams(fps).nominal - 1 : LIMITS[id];
+                    const delta = e.key === "ArrowUp" ? 1 : -1;
+                    const n = (Number(el.value || 0) + delta + max + 1) % (max + 1);
+                    el.value = String(n).padStart(2, "0");
+                    update();
+                    el.select();
+                }
+            });
         });
 
-        function updateStringByIndex(str, index, char) {
-            return str.substring(0, index) + char + str.substring(index + 1);
-        }
+        // Paste a full timecode into any field.
+        document.querySelector(".tc").addEventListener("paste", (e) => {
+            const digits = (e.clipboardData.getData("text") || "").replace(/\D/g, "");
+            if (digits.length < 8) return;
+            e.preventDefault();
+            FIELDS.forEach((id, i) => { $(id).value = digits.slice(i * 2, i * 2 + 2); });
+            update();
+        });
 
-        function moveNext(current, nextId) {
-            if (current.value.length >= current.maxLength) {
-                document.getElementById(nextId)?.focus();
+        document.querySelectorAll(".segmented button").forEach((b) => {
+            b.addEventListener("click", () => setFps(b.dataset.fps));
+        });
+
+        $("copyLink").addEventListener("click", async () => {
+            const btn = $("copyLink");
+            try {
+                await navigator.clipboard.writeText(window.location.href);
+                btn.textContent = "Copied!";
+            } catch {
+                btn.textContent = "Copy failed";
             }
-        }
+            setTimeout(() => { btn.textContent = "Copy link"; }, 1500);
+        });
 
-        function updateTimecode() {
-            const hh = document.getElementById("hh").value.padStart(2, '0');
-            const mm = document.getElementById("mm").value.padStart(2, '0');
-            const ss = document.getElementById("ss").value.padStart(2, '0');
-            const ff = document.getElementById("ff").value.padStart(2, '0');
-            const framerate = document.getElementById("framerate").value;
-
-            const params = new URLSearchParams(window.location.search); // Get current query string
-            // Set or update the 't' parameter with a new value (e.g., 12345678)
-            params.set('t', `${hh}${mm}${ss}${ff}@${framerate}`);
-            // Update the browser's URL (without reloading the page)
-            window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
-
-
-            const timecode = `${hh}:${mm}:${ss};${ff}`;
-            const timecode_full = `${timecode} @ ${framerate}fps`;
-
-            let valid = isValidDropFrameTimecode(timecode, framerate);
-
-            let tcText = `✅ ${timecode} is valid drop frame timecode`
-
-            if (!valid) {
-                tcText = `❌ ${timecode} is <strong>not</strong> valid drop frame timecode`
+        // Load ?t=HHMMSSFF@fps from the URL.
+        document.addEventListener("DOMContentLoaded", () => {
+            const params = new URLSearchParams(window.location.search);
+            let t = params.get("t") || "";
+            if (t.includes("@")) {
+                const [tc, ...rest] = t.split("@");
+                t = tc;
+                const rate = rest.join("@");
+                if (rate === "29.97" || rate === "59.94") fps = rate;
             }
-
-            document.getElementById("fullTimecode").innerHTML = tcText;
-        }
-
-    function isValidDropFrameTimecode(timecode, fps) {
-
-        fps = parseFloat(fps);
-        let lastFrame = 2;
-        if (fps === 59.94) {
-            lastFrame = 4
-        }
-
-        const dropFrameRegex = /^(\d{2}):(\d{2}):(\d{2});(\d{2})$/;
-        const match = timecode.match(dropFrameRegex);
-
-        if (!match) return false;
-
-        let hours = parseInt(match[1], 10);
-        let minutes = parseInt(match[2], 10);
-        let seconds = parseInt(match[3], 10);
-        let frames = parseInt(match[4], 10);
-
-        // Validate time range
-        if (hours > 23 || minutes > 59 || seconds > 59 || frames > 29) return false;
-
-        // Drop-frame rule: At the start of each minute (seconds == 0),
-        // frames 00 and 01 are skipped, except for minutes that are multiples of 10.
-        if (seconds === 0 && frames < 2 && minutes % 10 !== 0) {
-            return false;
-        }
-
-        return true;
-    }
-
-
+            if (t) {
+                let start = "00000000";
+                for (let i = 0; i < Math.min(t.length, 8); i++) {
+                    start = start.substring(0, i) + t[i] + start.substring(i + 1);
+                }
+                FIELDS.forEach((id, i) => { $(id).value = start.slice(i * 2, i * 2 + 2); });
+            }
+            setFps(fps);
+        });
     </script>
 </body>
 </html>
